@@ -1,6 +1,7 @@
 """Punto de entrada de la API. uv run fastapi dev app/main.py"""
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 from app.routers import catalegs, entrades, incidencies, lots, lots_en_us, produccio, traca
 
@@ -13,6 +14,11 @@ app.include_router(produccio.router, tags=["produccio"])
 app.include_router(lots.router, tags=["lots"])
 app.include_router(traca.router, tags=["traca"])
 app.include_router(incidencies.router, tags=["incidencies"])
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse("/docs")
 
 
 @app.get("/health")
