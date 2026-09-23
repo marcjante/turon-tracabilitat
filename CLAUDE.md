@@ -86,3 +86,13 @@ No se pasa a la siguiente fase hasta que los tests de la actual estén en verde.
 
 ## Comandos
 `uv run fastapi dev app/main.py` · `uv run pytest -q` · `uv run alembic upgrade head` · `uv run python -m app.seed`
+
+## Despliegue
+
+Railway (proyecto `turon-tracabilitat-api`, workspace de marcjante):
+- Servicio `api`: build con `Dockerfile` (uv, Python 3.12), `railway.json` fuerza el builder Docker. El CMD corre `alembic upgrade head` antes de arrancar uvicorn en cada despliegue — el esquema siempre está al día.
+- Servicio `Postgres`: plugin gestionado de Railway. `DATABASE_URL` en `api` es una variable de referencia (`${{Postgres.DATABASE_URL}}`), no un valor fijo.
+- `app/db.py` normaliza `postgres://`/`postgresql://` a `postgresql+psycopg://` (driver psycopg v3) automáticamente.
+- URL pública: https://api-production-4789d.up.railway.app
+- Redeploy manual: `railway redeploy -s api --yes` (reusa el build) o `railway up -s api -y --detach` (rebuild completo). **Importante**: no ejecutar `railway up` sin `-s api` — sin el flag puede apuntar al servicio enlazado equivocado.
+- Seed en producción: `railway ssh -s api -- uv run python -m app.seed` (no se puede ejecutar en local contra `DATABASE_URL` porque `postgres.railway.internal` solo resuelve dentro de la red privada de Railway).
