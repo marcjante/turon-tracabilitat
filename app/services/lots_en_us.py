@@ -3,7 +3,16 @@
 Regla de negocio 1: al abrir un lote en uso, en la misma transacción se
 cierra (fi = inici del nuevo) el lote abierto del mismo ingrediente y se
 abre el nuevo. Si el lote de materia prima está caducado, 422.
-"""
+
+Conflicto entre dispositivos (fase 8 offline): dos tablets pueden abrir
+un lote en uso del mismo ingrediente estando ambas sin conexión; el
+orden en que sus peticiones llegan al sincronizar no tiene por qué
+coincidir con el orden real de sus `inici`. obrir_lot_en_us() no asume
+que "el que llega ahora es el más reciente" — busca su predecesor y
+sucesor real por `inici` entre los registros ya existentes de ese
+ingrediente y se inserta en el punto correcto de la línia de tiempo,
+así que el resultado final converge igual sea cual sea el orden de
+llegada (ver test_dos_dispositius_offline_obren_en_ordre_invers)."""
 
 from datetime import datetime, timezone
 
@@ -39,17 +48,34 @@ def obrir_lot_en_us(session: Session, payload: LotEnUsCreate) -> LotEnUs:
     if lot.caducitat is not None and lot.caducitat < inici.date():
         raise HTTPException(status_code=422, detail=f"el lote {lot.codi} está caducado ({lot.caducitat})")
 
-    obert = session.exec(
-        select(LotEnUs).where(LotEnUs.ingredient_id == payload.ingredient_id, LotEnUs.fi.is_(None))
+    # Predecessor real: el registre d'aquest ingredient amb l'`inici` més
+    # gran que no sigui posterior al nostre. Si encara estava obert
+    # (fi IS NULL), l'hem de tancar ara — però només en aquest cas; si ja
+    # estava tancat (per un `tancar_lot_en_us` manual, o perquè un altre
+    # registre posterior ja el va tancar), no el toquem.
+    anterior = session.exec(
+        select(LotEnUs)
+        .where(LotEnUs.ingredient_id == payload.ingredient_id, LotEnUs.inici <= inici)
+        .order_by(LotEnUs.inici.desc())
     ).first()
-    if obert is not None:
-        obert.fi = inici
-        session.add(obert)
+    if anterior is not None and anterior.fi is None:
+        anterior.fi = inici
+        session.add(anterior)
+
+    # Successor real: el registre amb l'`inici` més petit que sigui
+    # posterior al nostre. Si n'hi ha un, el nostre `fi` és el seu
+    # `inici` (encara que hagi arribat abans que nosaltres al servidor).
+    successor = session.exec(
+        select(LotEnUs)
+        .where(LotEnUs.ingredient_id == payload.ingredient_id, LotEnUs.inici > inici)
+        .order_by(LotEnUs.inici.asc())
+    ).first()
 
     nou = LotEnUs(
         ingredient_id=payload.ingredient_id,
         lot_id=payload.lot_id,
         inici=inici,
+        fi=successor.inici if successor is not None else None,
         observacions=payload.observacions,
         client_id=payload.client_id,
     )

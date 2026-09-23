@@ -85,6 +85,35 @@ def test_no_poden_haver_dos_lots_oberts_del_mateix_ingredient(session):
     session.rollback()
 
 
+def test_dos_dispositius_offline_obren_en_ordre_invers(session):
+    """Fase 8 (conflicte real entre dispositius): dues tablets, cadascuna
+    sense connexió, obren un lot del mateix ingredient. La tablet A ho fa
+    a les 11:00, la B a les 9:00 -- però per com han anat les sincronitzacions,
+    la petició de B arriba al servidor DESPRÉS que la de A. El resultat
+    final ha de reflectir l'ordre real (B abans, tancat quan comença A),
+    no l'ordre d'arribada."""
+    ingredient = _crear_ingredient(session)
+    lot_a = _crear_lot_materia_primera(session, ingredient.id, "A")
+    lot_b = _crear_lot_materia_primera(session, ingredient.id, "B")
+
+    # Arriba primer A (11:00)...
+    a = obrir_lot_en_us(session, LotEnUsCreate(ingredient_id=ingredient.id, lot_id=lot_a.id, inici=_utc(2026, 1, 1, 11, 0)))
+    assert a.fi is None
+
+    # ...i després B (9:00), tot i ser cronològicament anterior.
+    b = obrir_lot_en_us(session, LotEnUsCreate(ingredient_id=ingredient.id, lot_id=lot_b.id, inici=_utc(2026, 1, 1, 9, 0)))
+
+    session.refresh(a)
+    assert b.fi == _utc(2026, 1, 1, 11, 0)  # B es tanca quan comença A, no queda "obert per sempre"
+    assert a.fi is None  # A continua sent l'obert de veritat -- B arribar tard no l'hauria de tocar
+
+    # I la consulta que fa servir ficha 3/4 per vincular automàticament
+    # ha de trobar el lot correcte segons l'hora real, no segons l'ordre
+    # de sincronització.
+    a_les_10 = lot_obert_per_ingredient(session, ingredient.id, _utc(2026, 1, 1, 10, 0))
+    assert a_les_10.lot_id == lot_b.id
+
+
 def test_obrir_lot_caducat_retorna_422(client, session):
     ingredient = _crear_ingredient(session)
     lot = _crear_lot_materia_primera(session, ingredient.id, "CADUCAT", caducitat=date.today() - timedelta(days=1))
