@@ -15,6 +15,8 @@ class SemielaboratCreate(BaseModel):
     torn: str
     responsable: str
     observacions: str | None = None
+    # UUID del dispositiu (fase 4/5 offline) — ver crear_produccio().
+    client_id: str | None = None
 
     _elaborat_at_utc = field_validator("elaborat_at")(to_utc)
 
@@ -40,6 +42,7 @@ class ElaboracioLotRead(BaseModel):
     elaborat_at: datetime
     torn: str
     anulat_per_id: int | None
+    client_id: str | None = None
 
 
 class ElaboracioLotCreateResponse(ElaboracioLotRead):

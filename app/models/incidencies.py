@@ -30,3 +30,4 @@ class Incidencia(SQLModel, table=True):
     # Trazabilidad hacia delante del lote afectado en el momento de crear
     # la incidencia — ver services/traca.py cuando exista (Fase 3).
     afectats_snapshot: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    client_id: str | None = Field(default=None, unique=True, index=True)

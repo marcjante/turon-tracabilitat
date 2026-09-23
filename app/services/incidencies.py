@@ -12,6 +12,13 @@ from app.services.traca import traca_endavant
 
 
 def crear_incidencia(session: Session, payload) -> Incidencia:
+    # Idempotència (fase 5 offline): evita recalcular traca_endavant
+    # (cost innecessari) i duplicar la incidència en un reintent.
+    if payload.client_id is not None:
+        existent = session.exec(select(Incidencia).where(Incidencia.client_id == payload.client_id)).first()
+        if existent is not None:
+            return existent
+
     if session.get(Lot, payload.lot_afectat_id) is None:
         raise HTTPException(status_code=404, detail="lot afectat no trobat")
     for camp, lot_id in (("lot_anterior_id", payload.lot_anterior_id), ("lot_nou_id", payload.lot_nou_id)):
@@ -32,6 +39,7 @@ def crear_incidencia(session: Session, payload) -> Incidencia:
         comprovacio=payload.comprovacio,
         comprovat_per=payload.comprovat_per,
         afectats_snapshot=snapshot,
+        client_id=payload.client_id,
     )
     session.add(incidencia)
     session.commit()

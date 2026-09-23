@@ -94,3 +94,4 @@ class LotEnUs(SQLModel, table=True):
     inici: datetime
     fi: datetime | None = Field(default=None)
     observacions: str | None = Field(default=None)
+    client_id: str | None = Field(default=None, unique=True, index=True)

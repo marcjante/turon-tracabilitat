@@ -115,6 +115,39 @@ def test_tancar_lot_en_us_sense_obrir_un_de_nou(session):
     assert tancat.fi == _utc(2026, 1, 2, 8, 0)
 
 
+def test_obrir_lot_amb_client_id_repetit_es_idempotent(session):
+    """Fase 5 (offline): reenviar el mateix client_id no ha de tancar
+    dues vegades l'anterior ni obrir dos registres nous."""
+    ingredient = _crear_ingredient(session)
+    lot_a = _crear_lot_materia_primera(session, ingredient.id, "A")
+    lot_b = _crear_lot_materia_primera(session, ingredient.id, "B")
+
+    obrir_lot_en_us(session, LotEnUsCreate(ingredient_id=ingredient.id, lot_id=lot_a.id, inici=_utc(2026, 1, 1, 9, 0)))
+    payload = LotEnUsCreate(
+        ingredient_id=ingredient.id, lot_id=lot_b.id, inici=_utc(2026, 1, 1, 11, 0),
+        client_id="22222222-2222-2222-2222-222222222222",
+    )
+    primer = obrir_lot_en_us(session, payload)
+    segon = obrir_lot_en_us(session, payload)
+    assert primer.id == segon.id
+
+    from sqlmodel import select
+    tots = session.exec(select(LotEnUs).where(LotEnUs.lot_id == lot_b.id)).all()
+    assert len(tots) == 1
+
+
+def test_tancar_lot_amb_mateix_fi_es_idempotent(session):
+    """Fase 5 (offline): reenviar el mateix tancament (mateix fi) no ha
+    de retornar 409 — és un reintent, no un conflicte real."""
+    ingredient = _crear_ingredient(session)
+    lot = _crear_lot_materia_primera(session, ingredient.id, "A")
+    obert = obrir_lot_en_us(session, LotEnUsCreate(ingredient_id=ingredient.id, lot_id=lot.id, inici=_utc(2026, 1, 1, 9, 0)))
+
+    primer = tancar_lot_en_us(session, obert.id, _utc(2026, 1, 2, 8, 0))
+    segon = tancar_lot_en_us(session, obert.id, _utc(2026, 1, 2, 8, 0))
+    assert primer.fi == segon.fi == _utc(2026, 1, 2, 8, 0)
+
+
 def test_tancar_lot_ja_tancat_retorna_409(client, session):
     ingredient = _crear_ingredient(session)
     lot = _crear_lot_materia_primera(session, ingredient.id, "A")

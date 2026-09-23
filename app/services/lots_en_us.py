@@ -24,6 +24,15 @@ def _lot_materia_primera_o_404(session: Session, lot_id: int, ingredient_id: int
 
 
 def obrir_lot_en_us(session: Session, payload: LotEnUsCreate) -> LotEnUs:
+    # Idempotència (fase 5 offline): si ja s'ha processat aquest
+    # client_id, es retorna el registre existent SENSE repetir l'efecte
+    # secundari de tancar l'anterior obert — repetir-lo tancaria un
+    # lot en ús que un altre dispositiu ja hagi obert de nou mentrestant.
+    if payload.client_id is not None:
+        existent = session.exec(select(LotEnUs).where(LotEnUs.client_id == payload.client_id)).first()
+        if existent is not None:
+            return existent
+
     inici = payload.inici or datetime.now(timezone.utc)
     lot = _lot_materia_primera_o_404(session, payload.lot_id, payload.ingredient_id)
 
@@ -42,6 +51,7 @@ def obrir_lot_en_us(session: Session, payload: LotEnUsCreate) -> LotEnUs:
         lot_id=payload.lot_id,
         inici=inici,
         observacions=payload.observacions,
+        client_id=payload.client_id,
     )
     session.add(nou)
     session.commit()
@@ -51,11 +61,18 @@ def obrir_lot_en_us(session: Session, payload: LotEnUsCreate) -> LotEnUs:
 
 def tancar_lot_en_us(session: Session, lot_en_us_id: int, fi: datetime) -> LotEnUs:
     """Cierra un lote en uso sin abrir uno nuevo (se acaba y todavía no
-    hay sustituto)."""
+    hay sustituto).
+
+    Idempotente por estado, no por client_id: si ya estaba cerrado con
+    ese mismo fi (hasta el segundo), un reintento offline devuelve el
+    registro tal cual en vez de 409 — necesario porque un dispositivo
+    puede reenviar el cierre si perdió la respuesta original."""
     registre = session.get(LotEnUs, lot_en_us_id)
     if registre is None:
         raise HTTPException(status_code=404, detail="registro de lote en uso no encontrado")
     if registre.fi is not None:
+        if registre.fi == fi:
+            return registre
         raise HTTPException(status_code=409, detail="este lote en uso ya estaba cerrado")
     registre.fi = fi
     session.add(registre)

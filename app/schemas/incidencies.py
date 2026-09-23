@@ -20,6 +20,7 @@ class IncidenciaCreate(BaseModel):
     mesura_adoptada: str | None = None
     comprovacio: bool = False
     comprovat_per: str | None = None
+    client_id: str | None = None
 
     _data_hora_utc = field_validator("data_hora")(to_utc)
 
@@ -37,3 +38,4 @@ class IncidenciaRead(BaseModel):
     comprovacio: bool
     comprovat_per: str | None
     afectats_snapshot: dict
+    client_id: str | None = None

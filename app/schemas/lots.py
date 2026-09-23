@@ -51,6 +51,7 @@ class LotEnUsCreate(BaseModel):
     lot_id: int
     inici: datetime | None = None
     observacions: str | None = None
+    client_id: str | None = None
 
     _inici_utc = field_validator("inici")(to_utc)
 
@@ -62,6 +63,7 @@ class LotEnUsRead(BaseModel):
     inici: datetime
     fi: datetime | None
     observacions: str | None
+    client_id: str | None = None
 
 
 class LotEnUsTancar(BaseModel):

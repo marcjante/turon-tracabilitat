@@ -101,6 +101,28 @@ def test_crear_semielaborat_vincula_lot_obert_i_genera_codi(client, session):
     assert consums[0].origen == "automatic"
 
 
+def test_crear_semielaborat_amb_client_id_repetit_es_idempotent(client, session):
+    """Fase 5 (offline): reenviar la mateixa creació no ha de duplicar
+    el lot ni el seu consum associat."""
+    moment = _utc(2026, 8, 14, 10, 0)
+    crema = _preparar_crema(session, moment)
+    payload = {
+        "elaboracio_id": crema.id, "quantitat": 5.0, "unitat": "kg",
+        "elaborat_at": moment.isoformat(), "torn": "matí", "responsable": "Anna",
+        "client_id": "33333333-3333-3333-3333-333333333333",
+    }
+    primer = client.post("/semielaborats", json=payload)
+    segon = client.post("/semielaborats", json=payload)
+    assert primer.status_code == 201 and segon.status_code == 201
+    assert primer.json()["id"] == segon.json()["id"]
+
+    from sqlmodel import select
+    lots = session.exec(select(Lot).where(Lot.elaboracio_id == crema.id)).all()
+    assert len(lots) == 1
+    consums = session.exec(select(Consum).where(Consum.lot_produit_id == lots[0].id)).all()
+    assert len(consums) == 1
+
+
 def test_dues_produccions_mateix_dia_reben_codis_consecutius(client, session):
     """Mandatory: dos cremas del mismo día reciben CRE-140826-01 y -02."""
     moment = _utc(2026, 8, 14, 10, 0)

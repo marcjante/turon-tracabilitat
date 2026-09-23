@@ -138,6 +138,25 @@ def test_incidencia_guarda_snapshot_dels_afectats(client, session):
     assert [i["codi"] for i in body["afectats_snapshot"]["producte"]] == ["BRA-01"]
 
 
+def test_crear_incidencia_amb_client_id_repetit_es_idempotent(client, session):
+    """Fase 5 (offline): reenviar la mateixa creació no ha de duplicar
+    la incidència."""
+    moment = _utc(2026, 1, 1, 10, 0)
+    lot_farina, _, _ = _cadena_farina_planxes_braços(session, moment)
+    payload = {
+        "tipus": "alerta", "responsable": "Anna", "lot_afectat_id": lot_farina.id,
+        "motiu": "Possible contaminació creuada",
+        "client_id": "44444444-4444-4444-4444-444444444444",
+    }
+    primer = client.post("/incidencies", json=payload)
+    segon = client.post("/incidencies", json=payload)
+    assert primer.status_code == 201 and segon.status_code == 201
+    assert primer.json()["id"] == segon.json()["id"]
+
+    response = client.get(f"/incidencies?lot_afectat_id={lot_farina.id}")
+    assert len(response.json()) == 1
+
+
 def test_incidencia_requereix_lot_afectat_existent(client):
     response = client.post("/incidencies", json={
         "tipus": "alerta", "responsable": "Anna", "lot_afectat_id": 9999, "motiu": "x",

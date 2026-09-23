@@ -74,6 +74,15 @@ def crear_produccio(
     tipus_esperat: TipusElaboracio,
     lots_semielaborats: dict[int, int] | None = None,
 ) -> tuple[Lot, bool]:
+    # Idempotència (fase 5 offline): evita repetir _resoldre_consums
+    # (podria "consumir" un lot en ús diferent si l'estat ha canviat
+    # entre l'intent original i el reintent) i generar un codi nou de
+    # franc en un reintent.
+    if getattr(payload, "client_id", None) is not None:
+        existent = session.exec(select(Lot).where(Lot.client_id == payload.client_id)).first()
+        if existent is not None:
+            return existent, False
+
     elaboracio = session.get(Elaboracio, payload.elaboracio_id)
     if elaboracio is None or not elaboracio.actiu:
         raise HTTPException(status_code=404, detail="elaboració no trobada")
@@ -95,6 +104,7 @@ def crear_produccio(
             unitat=payload.unitat,
             elaborat_at=elaborat_at,
             torn=payload.torn,
+            client_id=payload.client_id,
         )
 
     lot = crear_lot_amb_codi(session, elaboracio.prefix_lot, elaborat_at.date(), _construir)
