@@ -178,6 +178,26 @@ def test_anular_lot_no_el_borra_i_lexclou_de_les_consultes(client, session):
     assert "F-CORRECTE" in codis
 
 
+def test_obtenir_lot_per_id_inclou_anulats(client, session):
+    """A diferencia de /entrades i /lots/cerca, l'endpoint per id ha de
+    poder resoldre un lot encara que estigui anul·lat (necessari per
+    mostrar el codi d'un lot referenciat des d'una incidència)."""
+    farina = _crear_ingredient(session, "Farina")
+    lot_vell = _crear_lot_materia_primera(session, farina.id, "F-ERRONI")
+    lot_nou = _crear_lot_materia_primera(session, farina.id, "F-CORRECTE")
+    client.post(f"/lots/{lot_vell.id}/anular", json={"lot_nou_id": lot_nou.id})
+
+    response = client.get(f"/lots/{lot_vell.id}")
+    assert response.status_code == 200
+    assert response.json()["codi"] == "F-ERRONI"
+    assert response.json()["anulat_per_id"] == lot_nou.id
+
+
+def test_obtenir_lot_inexistent_retorna_404(client, session):
+    response = client.get("/lots/999999")
+    assert response.status_code == 404
+
+
 def test_anular_lot_amb_tipus_diferent_retorna_422(client, session):
     farina = _crear_ingredient(session, "Farina")
     lot_materia = _crear_lot_materia_primera(session, farina.id, "F-01")

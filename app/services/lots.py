@@ -13,6 +13,17 @@ from app.models.lots import Lot
 from app.services.traca import traca_endavant
 
 
+def obtenir_lot(session: Session, lot_id: int) -> Lot:
+    """A diferencia de las llistes (/entrades, /semielaborats...), aquí no
+    es filtren els lots anul·lats — cal poder-los consultar per resoldre
+    referències (p. ex. des d'una incidència) encara que ja no estiguin
+    "vius"."""
+    lot = session.get(Lot, lot_id)
+    if lot is None:
+        raise HTTPException(status_code=404, detail="lot no trobat")
+    return lot
+
+
 def anular_lot(session: Session, lot_id: int, lot_nou_id: int, motiu: str | None) -> Lot:
     lot = session.get(Lot, lot_id)
     if lot is None:
