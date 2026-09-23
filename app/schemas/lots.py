@@ -20,6 +20,11 @@ class EntradaCreate(BaseModel):
     tipus_data: TipusData
     responsable: str
     observacions: str | None = None
+    # UUID generat pel dispositiu quan es crea sense connexió. Si es
+    # reenvia la mateixa creació (p. ex. la resposta es va perdre en un
+    # tall de xarxa), el backend retorna el lot ja existent en comptes
+    # de duplicar-lo — veure crear_entrada().
+    client_id: str | None = None
 
 
 class EntradaRead(BaseModel):
@@ -35,6 +40,7 @@ class EntradaRead(BaseModel):
     caducitat: date
     tipus_data: TipusData
     anulat_per_id: int | None
+    client_id: str | None = None
 
 
 class LotEnUsCreate(BaseModel):

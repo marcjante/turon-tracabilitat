@@ -48,6 +48,11 @@ class Lot(SQLModel, table=True):
     responsable: str
     observacions: str | None = Field(default=None)
     anulat_per_id: int | None = Field(default=None, foreign_key="lot.id")
+    # UUID que genera el dispositiu en crear el lot sense connexió — permet
+    # que reenviar la mateixa creació (p. ex. per un tall de xarxa a mig
+    # sincronitzar) no dupliqui el lot. Nullable: els lots creats en línia
+    # abans d'aquesta columna no en tenen.
+    client_id: str | None = Field(default=None, unique=True, index=True)
 
     # Materia prima (ficha 1)
     ingredient_id: int | None = Field(default=None, foreign_key="ingredient.id")
