@@ -1,21 +1,11 @@
-"""Schemas para entradas de materia prima (ficha 1) y lotes en uso (ficha 2).
-
-Los datetimes se guardan siempre en UTC (SQLModel lo exige: un datetime
-naive en un INSERT falla). Si el cliente (la tablet) manda uno sin
-información de zona horaria, se asume UTC en vez de rechazar la petición
-— más tolerante para un formulario rápido de obrador."""
+"""Schemas para entradas de materia prima (ficha 1) y lotes en uso (ficha 2)."""
 
 from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, field_validator, model_validator
 
 from app.models.lots import TipusData
-
-
-def _com_utc(value: datetime | None) -> datetime | None:
-    if value is not None and value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
+from app.utils import to_utc
 
 
 class EntradaCreate(BaseModel):
@@ -56,7 +46,7 @@ class LotEnUsCreate(BaseModel):
     inici: datetime | None = None
     observacions: str | None = None
 
-    _inici_utc = field_validator("inici")(_com_utc)
+    _inici_utc = field_validator("inici")(to_utc)
 
 
 class LotEnUsRead(BaseModel):
@@ -74,7 +64,7 @@ class LotEnUsTancar(BaseModel):
 
     fi: datetime | None = None
 
-    _fi_utc = field_validator("fi")(_com_utc)
+    _fi_utc = field_validator("fi")(to_utc)
 
     @model_validator(mode="after")
     def _default_fi(self):
